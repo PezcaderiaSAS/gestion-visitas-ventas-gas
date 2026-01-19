@@ -17,11 +17,10 @@ En tu terminal (dentro de la carpeta del proyecto), ejecuta:
 
 ```bash
 # Ya hemos configurado el origen por ti, así que solo necesitas subir:
-git branch -M main
 git push -u origin main
 ```
 
-**Nota**: Hemos configurado el repositorio para usar **SSH** (`git@github.com:PezcaderiaSAS/gestion-visitas-ventas-gas.git`). Asegúrate de tener tus claves SSH configuradas en GitHub.
+**Nota**: El repositorio está configurado con **HTTPS** (`https://github.com/PezcaderiaSAS/gestion-visitas-ventas-gas.git`). Es posible que te solicite tus credenciales de GitHub (Usuario y Token/Contraseña) en una ventana emergente.
 
 Si te pide credenciales, usa tu correo y contraseña (o Token de Acceso Personal si tienes 2FA activado).
 
