@@ -1,0 +1,374 @@
+<script>
+    /**
+     * FRONTEND LOGIC - GESTIÓN DE VISITAS
+     * Manejo de DOM, Validaciones y Comunicación con Servidor
+     */
+
+    let GLOBAL_DATA = { clientes: [], motivos: [], resultados: [] };
+    let rowCount = 0;
+
+    // --- INICIALIZACIÓN ---
+    window.onload = function () {
+        document.getElementById('fechaVisitaGlobal').valueAsDate = new Date();
+
+        // Cargar datos maestros
+        loadData();
+
+        // Cargar Dashboard Inicial (Mes actual)
+        loadDashboard('mes');
+
+        // Configurar listener para fecha de metas
+        const today = new Date();
+        const monthStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+        document.getElementById('goalMonth').value = monthStr;
+    };
+
+    function loadData() {
+        google.script.run
+            .withSuccessHandler(initApp)
+            .withFailureHandler(showError)
+            .getData();
+    }
+
+    function initApp(data) {
+        GLOBAL_DATA = data;
+        document.getElementById('userDisplay').innerText = data.user;
+        document.getElementById('loader').style.display = 'none';
+
+        // Historial ahora se gestiona en Dashboard y Ruta, se mantiene actualizado
+        renderHistorial(data.historial);
+
+        // Limpiar grid y agregar una fila inicial
+        document.getElementById('gridBody').innerHTML = '';
+        rowCount = 0;
+        addRow();
+    }
+
+    // --- DASHBOARD & METAS ---
+
+    function loadDashboard(period) {
+        // Actualizar botones activos
+        document.querySelectorAll('#pills-dashboard .btn-group .btn').forEach(b => b.classList.remove('active'));
+        event?.target?.classList.add('active'); // Si es invocado por click
+
+        setLoading(true);
+        google.script.run
+            .withSuccessHandler(updateDashboardUI)
+            .withFailureHandler(showError)
+            .getDashboardData(period);
+    }
+
+    function updateDashboardUI(data) {
+        setLoading(false);
+        const formatMoney = (val) => '$' + val.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+
+        // Actualizar Valores
+        document.getElementById('dash-ventas').innerText = formatMoney(data.ventas);
+        document.getElementById('dash-visitas').innerText = data.visitas; // Valor numérico
+        document.getElementById('dash-nuevos').innerText = data.nuevos;
+        document.getElementById('dash-ticket').innerText = formatMoney(data.ticketProm);
+
+        // Actualizar Metas y Barras de Progreso
+        const metas = data.metas;
+
+        // Ventas
+        document.getElementById('meta-ventas-val').innerText = formatMoney(metas.ventas);
+        updateProgress('prog-ventas', data.ventas, metas.ventas);
+
+        // Visitas
+        document.getElementById('meta-visitas-val').innerText = metas.visitas;
+        updateProgress('prog-visitas', data.visitas, metas.visitas);
+
+        // Nuevos
+        document.getElementById('meta-nuevos-val').innerText = metas.nuevos;
+        updateProgress('prog-nuevos', data.nuevos, metas.nuevos);
+
+        // Ticket (Sin progress bar, solo texto)
+        document.getElementById('meta-ticket-val').innerText = formatMoney(metas.ticket);
+    }
+
+    function updateProgress(id, current, goal) {
+        const bar = document.getElementById(id);
+        if (goal > 0) {
+            const pct = Math.min((current / goal) * 100, 100);
+            bar.style.width = pct + '%';
+            bar.className = 'progress-bar progress-bar-custom ' + (pct >= 100 ? 'bg-success' : (pct > 50 ? 'bg-info' : 'bg-warning'));
+        } else {
+            bar.style.width = '0%';
+        }
+    }
+
+    // --- GESTIÓN DE METAS ---
+
+    document.getElementById('goalsForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        setLoading(true);
+
+        const month = document.getElementById('goalMonth').value;
+        const goals = {
+            ventas: document.getElementById('g_ventas').value,
+            visitas: document.getElementById('g_visitas').value,
+            nuevos: document.getElementById('g_nuevos').value,
+            ticket: document.getElementById('g_ticket').value
+        };
+
+        google.script.run
+            .withSuccessHandler(() => {
+                setLoading(false);
+                Swal.fire('Éxito', 'Metas actualizadas correctamente.', 'success');
+                loadDashboard('mes'); // Recargar dashboard para ver reflejado
+            })
+            .withFailureHandler(showError)
+            .saveGoals(month, goals);
+    });
+
+    // Cargar metas al cambiar el mes en el formulario
+    document.getElementById('goalMonth').addEventListener('change', function () {
+        // Implementar carga de valores previos si se desea
+        // Por ahora lo dejamos simple
+    });
+
+    // --- GESTIÓN DEL GRID (TABLA DINÁMICA) ---
+
+    function addRow() {
+        rowCount++;
+        const tbody = document.getElementById('gridBody');
+        const tr = document.createElement('tr');
+        tr.id = `row-${rowCount}`;
+
+        // Generar opciones de selects una sola vez
+        const optMotivos = GLOBAL_DATA.motivos.map(m => `<option value="${m}">${m}</option>`).join('');
+        const optResultados = GLOBAL_DATA.resultados.map(r => `<option value="${r}">${r}</option>`).join('');
+
+        tr.innerHTML = `
+  <td style="position: relative; min-width: 250px;">
+    <div class="position-relative">
+      <div class="input-group">
+        <span class="input-group-text bg-white text-primary border-primary border-end-0">
+              <i class="bi bi-search"></i>
+            </span>
+        <input type="text" class="form-control search-input border-start-0"
+                  placeholder="Escribe cliente..."
+                  onkeyup="filterClients(this, ${rowCount})"
+                  id="search-${rowCount}" autocomplete="off">
+      </div>
+
+      <input type="hidden" id="clientId-${rowCount}">
+      <input type="hidden" id="clientNameReal-${rowCount}">
+
+      <ul class="suggestions-list" id="suggestions-${rowCount}" style="display:none;"></ul>
+    </div>
+  </td>
+  <td>
+    <select class="form-select" name="motivo" required>
+          <option value="" disabled selected>...</option>
+          ${optMotivos}
+        </select>
+  </td>
+  <td>
+    <select class="form-select" name="resultado" onchange="validateRow(${rowCount}, this)" required>
+          <option value="" disabled selected>...</option>
+          ${optResultados}
+        </select>
+  </td>
+  <td><input type="number" class="form-control text-end" id="valor-${rowCount}" value="0" min="0" oninput="calcNeto(${rowCount})">
+  </td>
+  <td><input type="number" class="form-control text-end" id="desc-${rowCount}" value="0" min="0" oninput="calcNeto(${rowCount})">
+  </td>
+  <td><input type="text" class="form-control text-end fw-bold bg-light" id="neto-${rowCount}" value="0" readonly></td>
+  <td><input type="text" class="form-control" name="obs" placeholder="Nota..."></td>
+  <td class="col-accion">
+    <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeRow(${rowCount})"><i class="bi bi-trash3-fill"></i></button>
+  </td>
+  `;
+        tbody.appendChild(tr);
+        // Foco en el buscador de la nueva fila
+        document.getElementById(`search-${rowCount}`).focus();
+    }
+
+    function removeRow(id) {
+        const row = document.getElementById(`row-${id}`);
+        if (document.getElementById('gridBody').rows.length > 1) {
+            row.remove();
+        } else {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'Debe haber al menos una fila.', showConfirmButton: false, timer: 1500 });
+        }
+    }
+
+    // --- BÚSQUEDA DE CLIENTES OPTIMIZADA ---
+
+    function filterClients(input, id) {
+        const list = document.getElementById(`suggestions-${id}`);
+        const val = input.value.toString().toLowerCase().trim(); // Limpiamos espacios
+
+        list.innerHTML = '';
+        list.style.display = 'none';
+
+        // Validación: Si no hay datos cargados, avisar en consola
+        if (!GLOBAL_DATA.clientes || GLOBAL_DATA.clientes.length === 0) {
+            console.warn("La lista de clientes está vacía o no se cargó.");
+            return;
+        }
+
+        // Buscar solo si hay al menos 2 caracteres
+        if (val.length < 2) return;
+
+        // Filtrado Seguro
+        const matches = GLOBAL_DATA.clientes.filter(c => {
+            // Verificación de seguridad por si algún campo viene nulo
+            const nombre = (c.nombre || "").toLowerCase();
+            const nit = (c.nit || "").toLowerCase();
+            return nombre.includes(val) || nit.includes(val);
+        });
+
+        if (matches.length === 0) return;
+
+        // Renderizar resultados (Máximo 8 para no saturar)
+        matches.slice(0, 8).forEach(c => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-building"></i> ${c.nombre}</span>
+        <span class="badge bg-light text-dark ms-2" style="font-size:0.7em">${c.nit}</span>
+      </div>
+    `;
+            li.onclick = () => {
+                input.value = c.rawName; // Mostrar nombre limpio
+                document.getElementById(`clientId-${id}`).value = c.id;
+                document.getElementById(`clientNameReal-${id}`).value = c.rawName;
+
+                list.style.display = 'none';
+
+                // Feedback visual de selección correcta
+                input.classList.remove('border-danger', 'border-primary');
+                input.classList.add('border-success', 'fw-bold');
+            };
+            list.appendChild(li);
+        });
+
+        list.style.display = 'block';
+    }
+
+    // Cierra la lista si hago clic fuera
+    document.addEventListener('click', function (e) {
+        const suggestions = document.querySelectorAll('.suggestions-list');
+        suggestions.forEach(list => {
+            if (e.target !== list && e.target.tagName !== 'INPUT') {
+                list.style.display = 'none';
+            }
+        });
+    });
+
+    // --- VALIDACIONES Y CÁLCULOS ---
+
+    function validateRow(id, select) {
+        const res = select.value.toLowerCase();
+        const inpValor = document.getElementById(`valor-${id}`);
+        const inpDesc = document.getElementById(`desc-${id}`);
+
+        if (res.includes('rechazo') || res.includes('sin avance')) {
+            inpValor.value = 0; inpDesc.value = 0;
+            inpValor.disabled = true; inpDesc.disabled = true;
+        } else {
+            inpValor.disabled = false; inpDesc.disabled = false;
+        }
+        calcNeto(id);
+    }
+
+    function calcNeto(id) {
+        const v = parseFloat(document.getElementById(`valor-${id}`).value) || 0;
+        const d = parseFloat(document.getElementById(`desc-${id}`).value) || 0;
+        const n = v - d;
+        document.getElementById(`neto-${id}`).value = n.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    }
+
+    // --- ENVÍOS ---
+
+    document.getElementById('multiForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const fecha = document.getElementById('fechaVisitaGlobal').value;
+        const rows = document.getElementById('gridBody').querySelectorAll('tr');
+        let records = [];
+        let error = null;
+
+        rows.forEach(row => {
+            const id = row.id.split('-')[1];
+            const cliId = document.getElementById(`clientId-${id}`).value;
+            const cliName = document.getElementById(`clientNameReal-${id}`).value;
+            const motivo = row.querySelector('select[name="motivo"]').value;
+            const resultado = row.querySelector('select[name="resultado"]').value;
+            const valor = document.getElementById(`valor-${id}`).value;
+            const descuento = document.getElementById(`desc-${id}`).value;
+            const obs = row.querySelector('input[name="obs"]').value;
+
+            if (!cliId) error = "Seleccione un cliente válido de la lista en todas las filas.";
+            if (resultado === "Pedido Cerrado" && parseFloat(valor) <= 0) error = "Los pedidos cerrados deben tener valor mayor a 0.";
+
+            records.push({
+                fecha, idCliente: cliId, nombreCliente: cliName, motivo, resultado, valor, descuento, observacion: obs
+            });
+        });
+
+        if (error) return Swal.fire('Atención', error, 'warning');
+
+        setLoading(true);
+        google.script.run
+            .withSuccessHandler(res => {
+                setLoading(false);
+                Swal.fire('Guardado', `${res.count} registros procesados.`, 'success');
+                // Resetear tabla pero mantener fecha
+                const currentFecha = document.getElementById('fechaVisitaGlobal').value;
+                initApp(GLOBAL_DATA);
+                document.getElementById('fechaVisitaGlobal').value = currentFecha;
+            })
+            .withFailureHandler(showError)
+            .processBulkForm(records);
+    });
+
+    document.getElementById('newClientForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        setLoading(true);
+
+        const data = {
+            nombre: document.getElementById('nc_nombre').value,
+            nit: document.getElementById('nc_nit').value,
+            telefono: document.getElementById('nc_telefono').value,
+            direccion: document.getElementById('nc_direccion').value,
+            ciudad: document.getElementById('nc_ciudad').value
+        };
+
+        google.script.run
+            .withSuccessHandler(res => {
+                // Recargar datos globales para actualizar lista de clientes
+                google.script.run.withSuccessHandler(newData => {
+                    GLOBAL_DATA = newData;
+                    setLoading(false);
+                    Swal.fire('Cliente Creado', `ID Asignado: ${res.newId}`, 'success');
+                    document.getElementById('newClientForm').reset();
+                    // Volver a la pestaña principal
+                    document.getElementById('pills-ruta-tab').click();
+                }).getData();
+            })
+            .withFailureHandler(showError)
+            .registerNewClient(data);
+    });
+
+    // --- UTILIDADES ---
+
+    function renderHistorial(data) {
+        const tb = document.getElementById('historialBody');
+        tb.innerHTML = '';
+        data.forEach(r => {
+            tb.innerHTML += `<tr><td>${r.fecha}</td><td>${r.cliente}</td><td>${r.resultado}</td><td class="text-end">$${parseFloat(r.valor).toLocaleString()}</td></tr>`;
+        });
+    }
+
+    function setLoading(bool) {
+        document.getElementById('loader').style.display = bool ? 'flex' : 'none';
+    }
+
+    function showError(e) {
+        setLoading(false);
+        Swal.fire('Error', e.message || e, 'error');
+    }
+</script>

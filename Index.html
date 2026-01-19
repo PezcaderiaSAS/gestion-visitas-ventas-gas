@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Comercial | Jhon2026</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <?!= include('Stylesheet'); ?>
+</head>
+
+<body>
+
+    <!-- LOADER -->
+    <div id="loader">
+        <div class="spinner-border spinner-custom" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="bi bi-rocket-takeoff-fill"></i> GESTIÓN VISITAS</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="nav nav-pills" id="mainTab" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="pills-dashboard-tab" data-bs-toggle="pill"
+                            data-bs-target="#pills-dashboard" type="button"><i class="bi bi-speedometer2"></i>
+                            Dashboard</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="pills-ruta-tab" data-bs-toggle="pill" data-bs-target="#pills-ruta"
+                            type="button"><i class="bi bi-geo-alt-fill"></i> Ruta / Visitas</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="pills-clientes-tab" data-bs-toggle="pill"
+                            data-bs-target="#pills-clientes" type="button"><i class="bi bi-people-fill"></i>
+                            Clientes</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="pills-metas-tab" data-bs-toggle="pill"
+                            data-bs-target="#pills-metas" type="button"><i class="bi bi-bullseye"></i> Metas</button>
+                    </li>
+                </ul>
+                <span class="navbar-text ms-3 text-white small" id="userDisplay">...</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <div class="container-fluid py-4">
+        <div class="tab-content" id="pills-tabContent">
+
+            <!-- ====== DASHBOARD TAB ====== -->
+            <div class="tab-pane fade show active" id="pills-dashboard" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h4 class="fw-bold text-secondary">Resumen de Gestión</h4>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary active"
+                                onclick="loadDashboard('hoy')">Hoy</button>
+                            <button type="button" class="btn btn-outline-secondary"
+                                onclick="loadDashboard('semana')">Esta Semana</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="loadDashboard('mes')">Este
+                                Mes</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="row">
+                    <!-- Ventas -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card card-custom metric-card border-start border-5 border-success">
+                            <i class="bi bi-currency-dollar metric-icon text-success"></i>
+                            <div class="metric-title">Ventas Totales</div>
+                            <div class="metric-value text-success" id="dash-ventas">$0</div>
+                            <div class="mt-2 text-muted small">Meta: <span id="meta-ventas-val">$0</span></div>
+                            <div class="progress progress-custom">
+                                <div class="progress-bar progress-bar-custom bg-success" id="prog-ventas"
+                                    style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Visitas -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card card-custom metric-card border-start border-5 border-info">
+                            <i class="bi bi-geo metric-icon text-info"></i>
+                            <div class="metric-title">Visitas Realizadas</div>
+                            <div class="metric-value text-info" id="dash-visitas">0</div>
+                            <div class="mt-2 text-muted small">Meta: <span id="meta-visitas-val">0</span></div>
+                            <div class="progress progress-custom">
+                                <div class="progress-bar progress-bar-custom bg-info" id="prog-visitas"
+                                    style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Nuevos -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card card-custom metric-card border-start border-5 border-warning">
+                            <i class="bi bi-person-plus metric-icon text-warning"></i>
+                            <div class="metric-title">Clientes Nuevos</div>
+                            <div class="metric-value text-warning" id="dash-nuevos">0</div>
+                            <div class="mt-2 text-muted small">Meta: <span id="meta-nuevos-val">0</span></div>
+                            <div class="progress progress-custom">
+                                <div class="progress-bar progress-bar-custom bg-warning" id="prog-nuevos"
+                                    style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Ticket Prom -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card card-custom metric-card border-start border-5 border-primary">
+                            <i class="bi bi-receipt metric-icon text-primary"></i>
+                            <div class="metric-title">Ticket Promedio</div>
+                            <div class="metric-value text-primary" id="dash-ticket">$0</div>
+                            <div class="mt-2 text-muted small">Meta: <span id="meta-ticket-val">$0</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historial Reciente Dashboard -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card card-custom">
+                            <div class="card-header-custom d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-clock-history"></i> Últimos 10 Movimientos</span>
+                                <button class="btn btn-sm btn-link"
+                                    onclick="document.getElementById('pills-ruta-tab').click()">Ver todo</button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped mb-0 text-center">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>Cliente</th>
+                                                <th>Resultado</th>
+                                                <th>Valor</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="historialBody">
+                                            <!-- Data por JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== RUTA / FORMULARIO TAB ====== -->
+            <div class="tab-pane fade" id="pills-ruta" role="tabpanel">
+                <div class="card card-custom">
+                    <div class="card-header-custom">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <i class="bi bi-file-earmark-spreadsheet"></i> REGISTRO DE VISITAS
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <div class="input-group input-group-sm w-50 ms-auto">
+                                    <span class="input-group-text">Fecha:</span>
+                                    <input type="date" class="form-control" id="fechaVisitaGlobal">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <form id="multiForm">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle table-custom" id="gridTable">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 25%">Cliente</th>
+                                            <th style="width: 15%">Motivo</th>
+                                            <th style="width: 15%">Resultado</th>
+                                            <th style="width: 12%">Valor Pedido</th>
+                                            <th style="width: 10%">Descuento</th>
+                                            <th style="width: 12%">Neto</th>
+                                            <th>Observación</th>
+                                            <th style="width: 5%"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="gridBody">
+                                        <!-- Filas dinámicas -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-between mt-3">
+                                <button type="button" class="btn btn-outline-secondary" onclick="addRow()">
+                                    <i class="bi bi-plus-circle"></i> Agregar Fila
+                                </button>
+                                <button type="submit" class="btn btn-primary-custom px-5">
+                                    <i class="bi bi-save"></i> GUARDAR RUTA
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== CLIENTES TAB ====== -->
+            <div class="tab-pane fade" id="pills-clientes" role="tabpanel">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card card-custom">
+                            <div class="card-header-custom bg-warning text-dark">
+                                <i class="bi bi-person-plus-fill"></i> Crear Nuevo Cliente
+                            </div>
+                            <div class="card-body">
+                                <form id="newClientForm">
+                                    <div class="row g-3">
+                                        <div class="col-md-12">
+                                            <label class="form-label">Nombre Comercial / Razón Social</label>
+                                            <input type="text" class="form-control" id="nc_nombre" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">NIT / Cédula</label>
+                                            <input type="text" class="form-control" id="nc_nit" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Teléfono</label>
+                                            <input type="text" class="form-control" id="nc_telefono">
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label class="form-label">Dirección</label>
+                                            <input type="text" class="form-control" id="nc_direccion">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Ciudad</label>
+                                            <input type="text" class="form-control" id="nc_ciudad" value="Bucaramanga">
+                                        </div>
+                                        <div class="col-12 text-end mt-4">
+                                            <button type="submit" class="btn btn-warning fw-bold">
+                                                <i class="bi bi-check-circle"></i> Registrar Cliente
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== METAS TAB ====== -->
+            <div class="tab-pane fade" id="pills-metas" role="tabpanel">
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="card card-custom">
+                            <div class="card-header-custom border-bottom-0">
+                                <i class="bi bi-trophy-fill text-warning"></i> Configuración de Metas Mensuales
+                            </div>
+                            <div class="card-body">
+                                <form id="goalsForm">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Mes Objetivo</label>
+                                        <input type="month" class="form-control" id="goalMonth" required>
+                                    </div>
+                                    <hr>
+                                    <div class="mb-3">
+                                        <label class="form-label">Meta de Ventas ($)</label>
+                                        <input type="number" class="form-control" id="g_ventas" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Meta de Visitas (Cantidad)</label>
+                                        <input type="number" class="form-control" id="g_visitas" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Meta de Nuevos Clientes</label>
+                                        <input type="number" class="form-control" id="g_nuevos" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Meta Ticket Promedio ($)</label>
+                                        <input type="number" class="form-control" id="g_ticket" required>
+                                    </div>
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-primary-custom">
+                                            Guardar Metas
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- End Tab Content -->
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <?!= include('JavaScript'); ?>
+</body>
+
+</html>
